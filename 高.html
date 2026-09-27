@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>平面圖形面積公式推導</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; padding: 0;
+            background-color: #ffffff;
+            font-family: '微軟正黑體', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: #333;
+            overflow: hidden;
+            display: flex; flex-direction: column; height: 100vh;
+            
+            /* iPad 觸控防護 */
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        
+        /* 頂部控制列 */
+        .header-container {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 20px;
+            background: #f8f9fa; border-bottom: 2px solid #ddd;
+            z-index: 10;
+        }
+
+        .left-controls {
+            display: flex; gap: 15px;
+        }
+
+        /* 頂部切換頁籤 */
+        .tabs {
+            display: flex; justify-content: center; gap: 20px;
+        }
+        .tabs button {
+            background: #fff; color: #555;
+            border: 2px solid #aaa; padding: 10px 25px; 
+            font-size: 1.3rem; font-weight: bold; border-radius: 10px;
+            cursor: pointer; transition: all 0.3s;
+            touch-action: manipulation;
+        }
+        .tabs button.active, .tabs button:hover {
+            color: #2980b9; border-color: #2980b9;
+            background: #eaf2f8;
+            box-shadow: 0 2px 5px rgba(41, 128, 185, 0.2);
+        }
+
+        /* 頂部控制按鈕 */
+        .action-btn {
+            color: white; border: none; padding: 10px 25px; 
+            font-size: 1.3rem; font-weight: bold; border-radius: 10px; cursor: pointer;
+            transition: transform 0.1s;
+            touch-action: manipulation;
+        }
+        #btn-auto { background: #27AE60; border: 2px solid #1E8449; box-shadow: 0 4px #1E8449; }
+        #btn-auto:active { transform: translateY(4px); box-shadow: 0 0 #1E8449; }
+        #btn-auto:disabled { background: #95a5a6; border-color: #7f8c8d; box-shadow: 0 4px #7f8c8d; cursor: not-allowed; }
+        
+        /* 高 按鈕樣式 */
+        #btn-height { background: #9B59B6; border: 2px solid #8E44AD; box-shadow: 0 4px #8E44AD; }
+        #btn-height:active { transform: translateY(4px); box-shadow: 0 0 #8E44AD; }
+
+        /* 尺 按鈕樣式 */
+        #btn-ruler { background: #F39C12; border: 2px solid #E67E22; box-shadow: 0 4px #E67E22; }
+        #btn-ruler:active { transform: translateY(4px); box-shadow: 0 0 #E67E22; }
+
+        #btn-reset { background: #E74C3C; border: 2px solid #C0392B; box-shadow: 0 4px #C0392B; }
+        #btn-reset:active { transform: translateY(4px); box-shadow: 0 0 #C0392B; }
+
+        /* 互動畫布區 */
+        .workspace-container {
+            flex: 1; position: relative; overflow: hidden;
+            display: flex; justify-content: center; align-items: center;
+        }
+        svg {
+            width: 100%; height: 100%;
+            touch-action: none;
+        }
+        .snapped polygon.draggable {
+            filter: drop-shadow(0 0 8px rgba(41, 128, 185, 0.6));
+        }
+
+        /* 底部控制與公式面板 */
+        .bottom-panel {
+            background: #f8f9fa;
+            border-top: 3px solid #333;
+            padding: 15px; 
+            display: flex; flex-direction: column; align-items: center;
+            z-index: 10;
+        }
+        #formula-panel {
+            background: #fff;
+            border: 3px solid #2980b9; padding: 12px 40px;
+            border-radius: 12px; font-size: 1.5rem; text-align: center;
+            line-height: 1.5; box-shadow: 4px 4px 0px rgba(41, 128, 185, 0.3);
+            color: #333;
+            min-width: 60%;
+        }
+
+        /* SVG 文字樣式 */
+        .svg-text {
+            font-family: '微軟正黑體', -apple-system, sans-serif;
+            font-size: 24px; font-weight: bold; 
+            fill: #000;
+            stroke: #fff;
+            stroke-width: 6px;
+            paint-order: stroke fill;
+            user-select: none; pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 頂部控制列 -->
+    <div class="header-container">
+        <div class="left-controls">
+            <button id="btn-auto" class="action-btn" onclick="autoPlay()">自動演示</button>
+            <button id="btn-height" class="action-btn" onclick="toggleStudent()">高</button>
+            <button id="btn-ruler" class="action-btn" onclick="toggleRuler()">尺</button>
+        </div>
+        
+        <div class="tabs">
+            <button onclick="setMode('para')" id="btn-para" class="active">平行四邊形</button>
+            <button onclick="setMode('tri')" id="btn-tri">三角形</button>
+            <button onclick="setMode('trap')" id="btn-trap">梯形</button>
+        </div>
+        
+        <button id="btn-reset" class="action-btn" onclick="resetMode()">重置圖形</button>
+    </div>
+    
+    <!-- 畫布區 -->
+    <div class="workspace-container">
+        <svg id="workspace" viewBox="-180 -120 800 450">
+            <defs>
+                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <rect width="40" height="40" fill="none" stroke="#000" stroke-width="2" />
+                </pattern>
+            </defs>
+            <rect x="-2000" y="-2000" width="4000" height="4000" fill="url(#grid)" />
+            
+            <g id="shape-group" transform="translate(40, 40)"></g>
+
+            <!-- 改用 SVG 原生向量繪製的三角尺群組 (高度 160，永不破圖) -->
+            <g id="ruler-group" style="display:none; cursor:grab;">
+                <path d="M 0 0 L 0 160 L 160 160 Z" fill="rgba(52, 152, 219, 0.2)" stroke="#2980b9" stroke-width="4" stroke-linejoin="round"/>
+                <path d="M 25 25 L 25 135 L 135 135 Z" fill="#ffffff" stroke="#2980b9" stroke-width="3" stroke-linejoin="round"/>
+                <!-- 刻度裝飾線 -->
+                <line x1="0" y1="10" x2="10" y2="10" stroke="#2980b9" stroke-width="2"/>
+                <line x1="0" y1="20" x2="8" y2="20" stroke="#2980b9" stroke-width="2"/>
+                <line x1="0" y1="30" x2="10" y2="30" stroke="#2980b9" stroke-width="2"/>
+                <line x1="0" y1="40" x2="8" y2="40" stroke="#2980b9" stroke-width="2"/>
+                <line x1="0" y1="50" x2="10" y2="50" stroke="#2980b9" stroke-width="2"/>
+                <line x1="0" y1="60" x2="8" y2="60" stroke="#2980b9" stroke-width="2"/>
+                <line x1="0" y1="70" x2="10" y2="70" stroke="#2980b9" stroke-width="2"/>
+                <line x1="0" y1="80" x2="8" y2="80" stroke="#2980b9" stroke-width="2"/>
+                <line x1="0" y1="90" x2="10" y2="90" stroke="#2980b9" stroke-width="2"/>
+                <line x1="0" y1="100" x2="8" y2="100" stroke="#2980b9" stroke-width="2"/>
+                <line x1="0" y1="110" x2="10" y2="110" stroke="#2980b9" stroke-width="2"/>
+                <line x1="0" y1="120" x2="8" y2="120" stroke="#2980b9" stroke-width="2"/>
+                <line x1="0" y1="130" x2="10" y2="130" stroke="#2980b9" stroke-width="2"/>
+                <line x1="0" y1="140" x2="8" y2="140" stroke="#2980b9" stroke-width="2"/>
+                <line x1="0" y1="150" x2="10" y2="150" stroke="#2980b9" stroke-width="2"/>
+            </g>
+            
+            <!-- 學生人物圖片：高度設定為 160 -->
+            <image id="student-char" href="student.png" width="80" height="160" preserveAspectRatio="xMidYMid meet" style="display:none; cursor:grab;" />
+        </svg>
+    </div>
+    
+    <!-- 底部公式區 -->
+    <div class="bottom-panel">
+        <div id="formula-panel">載入中...</div>
+    </div>
+
+<script>
+    const HIGHLIGHT_GREEN = '#00C853';
+
+    const PARA_CONFIGS = [
+        {
+            pieces: [
+                { id: 'p_right', points: '80,0 320,0 240,160 80,160', fill: '#3498db', stroke: '#2980b9', draggable: false },
+                { id: 'p_left', points: '80,0 80,160 0,160', fill: '#e74c3c', stroke: '#c0392b', draggable: true,
+                  targetX: 240, targetY: 0, targetRot: 0, origin: '40px 80px', hiddenAtStart: false }
+            ],
+            labels: [
+                { text: '底', x: 120, y: 195, visible: 'before' },
+                { text: '高', x: 125, y: 90, visible: 'always' },
+                { text: '長', x: 200, y: 195, visible: 'after' },
+                { text: '寬', x: 360, y: 90, visible: 'after' }
+            ],
+            lines: [ { x1: 80, y1: 0, x2: 80, y2: 160, stroke: HIGHLIGHT_GREEN, dash: '10,8', width: '6', drawPerp: true } ],
+            formulaBefore: '圖形：<span style="color:#2980b9; font-weight:bold;">平行四邊形 (款式一)</span><br><span style="font-size:1.2rem; color:#666">再次點擊按鈕可切換形狀！拖曳左側補到右邊試試看！</span>',
+            formulaAfter: '長方形面積 = 長 × 寬<br><span style="color:#e74c3c; font-weight:bold;">平行四邊形面積 = 底 × 高</span>'
+        },
+        {
+            pieces: [
+                { id: 'p_right', points: '120,0 240,0 120,160', fill: '#3498db', stroke: '#2980b9', draggable: false },
+                { id: 'p_left', points: '120,0 120,160 0,160', fill: '#e74c3c', stroke: '#c0392b', draggable: true,
+                  targetX: 120, targetY: 0, targetRot: 0, origin: '60px 80px', hiddenAtStart: false }
+            ],
+            labels: [
+                { text: '底', x: 60, y: 195, visible: 'before' },
+                { text: '高', x: 160, y: 90, visible: 'always' },
+                { text: '長', x: 180, y: 195, visible: 'after' },
+                { text: '寬', x: 280, y: 90, visible: 'after' }
+            ],
+            lines: [ { x1: 120, y1: 0, x2: 120, y2: 160, stroke: HIGHLIGHT_GREEN, dash: '10,8', width: '6', drawPerp: true } ],
+            formulaBefore: '圖形：<span style="color:#2980b9; font-weight:bold;">平行四邊形 (款式二)</span><br><span style="font-size:1.2rem; color:#666">再次點擊按鈕可切換形狀！拖曳左側補到右邊試試看！</span>',
+            formulaAfter: '長方形面積 = 長 × 寬<br><span style="color:#e74c3c; font-weight:bold;">平行四邊形面積 = 底 × 高</span>'
+        },
+        {
+            pieces: [
+                { id: 'p_right', points: '40,0 120,0 80,160 40,160', fill: '#3498db', stroke: '#2980b9', draggable: false },
+                { id: 'p_left', points: '40,0 40,160 0,160', fill: '#e74c3c', stroke: '#c0392b', draggable: true,
+                  targetX: 80, targetY: 0, targetRot: 0, origin: '20px 80px', hiddenAtStart: false }
+            ],
+            labels: [
+                { text: '底', x: 40, y: 195, visible: 'before' },
+                { text: '高', x: 80, y: 90, visible: 'always' },
+                { text: '長', x: 80, y: 195, visible: 'after' },
+                { text: '寬', x: 160, y: 90, visible: 'after' }
+            ],
+            lines: [ { x1: 40, y1: 0, x2: 40, y2: 160, stroke: HIGHLIGHT_GREEN, dash: '10,8', width: '6', drawPerp: true } ],
+            formulaBefore: '圖形：<span style="color:#2980b9; font-weight:bold;">平行四邊形 (款式三)</span><br><span style="font-size:1.2rem; color:#666">再次點擊按鈕可切換形狀！拖曳左側補到右邊試試看！</span>',
+            formulaAfter: '長方形面積 = 長 × 寬<br><span style="color:#e74c3c; font-weight:bold;">平行四邊形面積 = 底 × 高</span>'
+        }
+    ];
+
+    const MODES = {
+        tri: {
+            pieces: [
+                { id: 't_base', points: '120,0 0,160 240,160', fill: '#3498db', stroke: '#2980b9', draggable: false, cloneTarget: 't_drag' },
+                { id: 't_drag', points: '120,0 0,160 240,160', fill: '#e74c3c', stroke: '#c0392b', draggable: true,
+                  targetX: 120, targetY: 0, targetRot: 180, origin: '120px 80px', hiddenAtStart: true }
+            ],
+            labels: [
+                { text: '底', x: 120, y: 195, visible: 'always' },
+                { text: '高', x: 165, y: 90, visible: 'always' }
+            ],
+            lines: [ { x1: 120, y1: 0, x2: 120, y2: 160, stroke: HIGHLIGHT_GREEN, dash: '10,8', width: '6', drawPerp: true } ],
+            formulaBefore: '圖形：<span style="color:#2980b9; font-weight:bold;">三角形</span><br><span style="font-size:1.2rem; color:#666">點選藍色三角形複製，並翻轉拖曳！或使用自動演示。</span>',
+            formulaAfter: '拼成平行四邊形面積 = 底 × 高<br><span style="color:#e74c3c; font-weight:bold;">三角形面積 = (底 × 高) ÷ 2</span>'
+        },
+        trap: {
+            pieces: [
+                { id: 'tr_base', points: '80,0 200,0 240,160 0,160', fill: '#3498db', stroke: '#2980b9', draggable: false, cloneTarget: 'tr_drag' },
+                { id: 'tr_drag', points: '80,0 200,0 240,160 0,160', fill: '#e74c3c', stroke: '#c0392b', draggable: true,
+                  targetX: 200, targetY: 0, targetRot: 180, origin: '120px 80px', hiddenAtStart: true }
+            ],
+            labels: [
+                { text: '上底', x: 140, y: -15, visible: 'always' },
+                { text: '下底', x: 120, y: 195, visible: 'before' },
+                { text: '高', x: 125, y: 90, visible: 'always' },
+                { text: '拼成的大底 = (上底 + 下底)', x: 200, y: 195, visible: 'after' }
+            ],
+            lines: [ { x1: 80, y1: 0, x2: 80, y2: 160, stroke: HIGHLIGHT_GREEN, dash: '10,8', width: '6', drawPerp: true } ],
+            formulaBefore: '圖形：<span style="color:#2980b9; font-weight:bold;">梯形</span><br><span style="font-size:1.2rem; color:#666">點選藍色梯形複製，並翻轉拖曳！或使用自動演示。</span>',
+            formulaAfter: '大平行四邊形底邊 = (上底 + 下底)<br><span style="color:#e74c3c; font-weight:bold;">梯形面積 = (上底 + 下底) × 高 ÷ 2</span>'
+        }
+    };
+
+    let currentMode = 'para';
+    let paraIndex = 0;
+    let isSnapped = false;
+    let pieceState = {}; 
+    let dragState = { active: false, id: null, el: null, offsetX: 0, offsetY: 0 };
+    const svg = document.getElementById('workspace');
+
+    // 學生角色狀態 (嚴格限制 Y 軸固定在 40)
+    let studentVisible = false;
+    let studentState = { x: -60, y: 40 }; 
+    let studentDrag = { active: false, el: null, offsetX: 0 };
+
+    // 尺子狀態 (嚴格限制 Y 軸固定在 40)
+    let rulerVisible = false;
+    let rulerState = { x: -140, y: 40 }; 
+    let rulerDrag = { active: false, el: null, offsetX: 0 };
+
+    function toggleStudent() {
+        studentVisible = !studentVisible;
+        const img = document.getElementById('student-char');
+        if (studentVisible) {
+            img.style.display = 'block';
+            applyStudentTransform(studentState.x);
+        } else {
+            img.style.display = 'none';
+        }
+    }
+
+    function applyStudentTransform(x) {
+        studentState = { x: x, y: 40 };
+        const img = document.getElementById('student-char');
+        img.setAttribute('transform', `translate(${x}, 40)`);
+    }
+
+    function toggleRuler() {
+        rulerVisible = !rulerVisible;
+        const group = document.getElementById('ruler-group');
+        if (rulerVisible) {
+            group.style.display = 'block';
+            applyRulerTransform(rulerState.x);
+        } else {
+            group.style.display = 'none';
+        }
+    }
+
+    function applyRulerTransform(x) {
+        rulerState = { x: x, y: 40 };
+        const group = document.getElementById('ruler-group');
+        group.setAttribute('transform', `translate(${x}, 40)`);
+    }
+
+    function setMode(mode) {
+        if (mode === 'para' && currentMode === 'para') {
+            paraIndex = (paraIndex + 1) % 3;
+        } else if (mode !== 'para') {
+            paraIndex = 0;
+        }
+        
+        currentMode = mode;
+        
+        document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+        if (mode === 'para') {
+            document.getElementById('btn-para').classList.add('active');
+        } else {
+            document.getElementById(`btn-${mode}`).classList.add('active');
+        }
+        
+        renderMode(mode);
+    }
+
+    function renderMode(mode) {
+        const group = document.getElementById('shape-group');
+        group.innerHTML = '';
+        group.classList.remove('snapped');
+        pieceState = {};
+        
+        const cfg = (mode === 'para') ? PARA_CONFIGS[paraIndex] : MODES[mode];
+        
+        cfg.pieces.forEach(p => {
+            let attrs = `id="${p.id}" points="${p.points}" fill="${p.fill}" stroke="${p.stroke}" stroke-width="3" stroke-linejoin="round"`;
+            if (p.draggable) {
+                attrs += ` class="draggable" data-tx="${p.targetX}" data-ty="${p.targetY}" data-trot="${p.targetRot}" data-origin="${p.origin}"`;
+                if (p.hiddenAtStart) attrs += ` style="display:none; cursor:grab;" data-needs-flip="true"`;
+                else attrs += ` style="cursor:grab;"`;
+                pieceState[p.id] = { x: 0, y: 0, rot: 0 };
+            } else {
+                if (p.cloneTarget) attrs += ` class="base-shape" data-clone="${p.cloneTarget}" style="cursor:pointer;"`;
+            }
+            group.innerHTML += `<polygon ${attrs} />`;
+        });
+        
+        cfg.lines.forEach(l => {
+            group.innerHTML += `<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="${l.stroke}" stroke-dasharray="${l.dash}" stroke-width="${l.width}" stroke-linecap="round" />`;
+            
+            if (l.drawPerp) {
+                const s = 15; 
+                group.innerHTML += `<polyline points="${l.x2},${l.y2 - s} ${l.x2 - s},${l.y2 - s} ${l.x2 - s},${l.y2}" fill="none" stroke="${l.stroke}" stroke-width="4" stroke-linejoin="round" />`;
+            }
+        });
+        
+        cfg.labels.forEach((l, i) => {
+            const cls = `svg-text ${l.visible === 'before' ? 'label-before' : l.visible === 'after' ? 'label-after' : 'label-always'}`;
+            const display = l.visible === 'after' ? 'display:none;' : '';
+            group.innerHTML += `<text class="${cls}" x="${l.x}" y="${l.y}" text-anchor="middle" style="${display}">${l.text}</text>`;
+        });
+        
+        isSnapped = false;
+        document.getElementById('formula-panel').innerHTML = cfg.formulaBefore;
+    }
+
+    function applyTransform(id, x, y, rot) {
+        if (!pieceState[id]) return;
+        pieceState[id] = { x, y, rot };
+        const el = document.getElementById(id);
+        if (el) {
+            el.style.transformOrigin = el.dataset.origin;
+            el.style.transform = `translate(${x}px, ${y}px) rotate(${rot}deg)`;
+        }
+    }
+
+    function getSVGPoint(e) {
+        const pt = svg.createSVGPoint();
+        pt.x = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+        pt.y = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+        return pt.matrixTransform(svg.getScreenCTM().inverse());
+    }
+
+    svg.addEventListener('pointerdown', (e) => {
+        let el = e.target;
+        
+        // 學生角色拖曳 (僅限 X 軸平移)
+        if (el.id === 'student-char') {
+            el.setPointerCapture(e.pointerId);
+            const pt = getSVGPoint(e);
+            studentDrag = { active: true, el: el, offsetX: pt.x - studentState.x };
+            el.style.cursor = 'ew-resize';
+            return;
+        }
+
+        // 尺子拖曳 (檢查點擊目標是否屬於 ruler-group 內部，僅限 X 軸平移)
+        const rulerGroup = document.getElementById('ruler-group');
+        if (rulerGroup.contains(el)) {
+            const target = rulerGroup;
+            target.setPointerCapture(e.pointerId);
+            const pt = getSVGPoint(e);
+            rulerDrag = { active: true, el: target, offsetX: pt.x - rulerState.x };
+            target.style.cursor = 'ew-resize';
+            return;
+        }
+
+        if (el.classList.contains('base-shape')) {
+            const cloneId = el.dataset.clone;
+            if (cloneId) {
+                el = document.getElementById(cloneId);
+                if (el.style.display === 'none') {
+                    el.style.display = 'block';
+                    el.dataset.needsFlip = 'true';
+                }
+            }
+        }
+        
+        if (el && el.classList.contains('draggable')) {
+            el.setPointerCapture(e.pointerId);
+            if (isSnapped) unSnap();
+            
+            const pt = getSVGPoint(e);
+            const id = el.id;
+            dragState = { active: true, id, el, offsetX: pt.x - pieceState[id].x, offsetY: pt.y - pieceState[id].y };
+            
+            if (el.dataset.needsFlip === 'true') {
+                el.dataset.needsFlip = 'false';
+                el.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+                applyTransform(id, pieceState[id].x, pieceState[id].y, parseFloat(el.dataset.trot));
+                setTimeout(() => { if (dragState.id === id) el.style.transition = 'none'; }, 400);
+            } else {
+                el.style.transition = 'none';
+            }
+        }
+    });
+
+    svg.addEventListener('pointermove', (e) => {
+        const pt = getSVGPoint(e);
+        
+        // 學生移動邏輯：嚴格禁止上下移動，僅限左右平移
+        if (studentDrag.active) {
+            applyStudentTransform(pt.x - studentDrag.offsetX);
+            return;
+        }
+
+        // 尺子移動邏輯：嚴格禁止上下移動，僅限左右平移
+        if (rulerDrag.active) {
+            applyRulerTransform(pt.x - rulerDrag.offsetX);
+            return;
+        }
+        
+        // 幾何形狀移動邏輯
+        if (dragState.active) {
+            applyTransform(dragState.id, pt.x - dragState.offsetX, pt.y - dragState.offsetY, pieceState[dragState.id].rot);
+        }
+    });
+
+    svg.addEventListener('pointerup', endDrag);
+    svg.addEventListener('pointercancel', endDrag);
+
+    function endDrag(e) {
+        if (studentDrag.active) {
+            studentDrag.el.style.cursor = 'grab';
+            studentDrag.el.releasePointerCapture(e.pointerId);
+            studentDrag.active = false;
+            return;
+        }
+
+        if (rulerDrag.active) {
+            rulerDrag.el.style.cursor = 'grab';
+            rulerDrag.el.releasePointerCapture(e.pointerId);
+            rulerDrag.active = false;
+            return;
+        }
+
+        if (!dragState.active) return;
+        const el = dragState.el;
+        el.releasePointerCapture(e.pointerId);
+        dragState.active = false;
+        
+        const tx = parseFloat(el.dataset.tx);
+        const ty = parseFloat(el.dataset.ty);
+        const trot = parseFloat(el.dataset.trot);
+        const state = pieceState[dragState.id];
+        
+        const dist = Math.hypot(state.x - tx, state.y - ty);
+        if (dist < 45) { 
+            el.style.transition = 'transform 0.3s ease-out';
+            applyTransform(dragState.id, tx, ty, trot);
+            setTimeout(() => { if(!dragState.active) onSnapped(); }, 300);
+        }
+    }
+
+    function onSnapped() {
+        if (isSnapped) return;
+        isSnapped = true;
+        document.querySelectorAll('.label-before').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.label-after').forEach(el => el.style.display = '');
+        document.getElementById('shape-group').classList.add('snapped');
+        
+        const cfg = (currentMode === 'para') ? PARA_CONFIGS[paraIndex] : MODES[currentMode];
+        document.getElementById('formula-panel').innerHTML = cfg.formulaAfter;
+    }
+
+    function unSnap() {
+        isSnapped = false;
+        document.querySelectorAll('.label-before').forEach(el => el.style.display = '');
+        document.querySelectorAll('.label-after').forEach(el => el.style.display = 'none');
+        document.getElementById('shape-group').classList.remove('snapped');
+        
+        const cfg = (currentMode === 'para') ? PARA_CONFIGS[paraIndex] : MODES[currentMode];
+        document.getElementById('formula-panel').innerHTML = cfg.formulaBefore;
+    }
+
+    function resetMode() { renderMode(currentMode); }
+
+    async function autoPlay() {
+        const btn = document.getElementById('btn-auto');
+        btn.disabled = true;
+        
+        if (isSnapped) { unSnap(); await sleep(400); }
+        
+        let id = currentMode === 'para' ? 'p_left' : currentMode === 'tri' ? 't_drag' : 'tr_drag';
+        const el = document.getElementById(id);
+        applyTransform(id, 0, 0, 0); 
+        
+        if (currentMode !== 'para') {
+            el.style.display = 'block';
+            el.dataset.needsFlip = 'false';
+            await sleep(50);
+            el.style.transition = 'transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            applyTransform(id, 0, 0, parseFloat(el.dataset.trot));
+            await sleep(800);
+        }
+        
+        el.style.transition = 'transform 1s ease-in-out';
+        applyTransform(id, parseFloat(el.dataset.tx), parseFloat(el.dataset.ty), parseFloat(el.dataset.trot));
+        
+        await sleep(1000);
+        onSnapped();
+        btn.disabled = false;
+    }
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    
+    setMode('para');
+</script>
+</body>
+</html>
+
+
